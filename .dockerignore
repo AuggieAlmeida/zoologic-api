@@ -1,0 +1,33 @@
+# Diretórios de dependências
+node_modules/
+vendor/
+.venv/
+
+# Arquivos de configuração local
+.vscode/
+.idea/
+
+# Arquivos de controle de versão
+.git/
+.gitignore
+
+# Arquivos de build
+dist/
+build/
+
+# Arquivos de log
+*.log
+
+# Arquivos temporários
+*.tmp
+*.bak
+
+# Arquivos específicos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Ignorar pastas de teste
+tests/
+spec/
+test/
+coverage/

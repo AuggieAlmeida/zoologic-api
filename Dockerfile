@@ -14,6 +14,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Define o diretório de trabalho
 WORKDIR /var/www/html
 
+# Copia o arquivo .env para o contêiner
+COPY .env /var/www/html/.env
+
+
 # Copia os arquivos do projeto
 COPY . .
 

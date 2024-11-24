@@ -18,7 +18,8 @@ Options -Indexes
     Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
     Header set Access-Control-Allow-Headers "Content-Type, Authorization"
     Header set Access-Control-Allow-Credentials "true"
-    SetEnvIf Origin "^(http://localhost:3000|http://172.19.0.1:3000|http://10.0.0.2:3000|http://172.19.0.2:3000|http://192.168.15.128:3000)$" ORIGIN=$0
+    # Altere a lista de origens conforme necessário
+    SetEnvIf Origin "^(http://localhost:3000|http://172.19.0.1:3000|http://10.0.0.2:3000|http://172.19.0.2:3000|http://192.168.15.128:3000|http://my-api.up.railway.app)$" ORIGIN=$0
 </IfModule>
 
 # Se estiver usando mod_rewrite para URLs amigáveis
@@ -27,4 +28,3 @@ Options -Indexes
     RewriteCond %{REQUEST_METHOD} OPTIONS
     RewriteRule ^(.*)$ $1 [R=200,L]
 </IfModule> 
-

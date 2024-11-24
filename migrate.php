@@ -1,13 +1,35 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
 
+// Carrega as variáveis de ambiente
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
+// Função para aguardar o banco estar disponível
+function waitForDatabase($host, $user, $pass, $port = 3306, $retries = 10, $delay = 5) {
+    $dsn = "mysql:host={$host};port={$port}";
+    while ($retries > 0) {
+        try {
+            $pdo = new PDO($dsn, $user, $pass);
+            $pdo = null;
+            echo "Banco de dados está disponível!\n";
+            return;
+        } catch (PDOException $e) {
+            echo "Aguardando banco de dados... ({$retries} tentativas restantes)\n";
+            sleep($delay);
+            $retries--;
+        }
+    }
+    throw new Exception("Banco de dados indisponível após várias tentativas.");
+}
+
 try {
-    // Primeiro, conecta sem especificar o banco de dados
+    // Aguarda o banco de dados ficar disponível
+    waitForDatabase($_ENV['DB_HOST'], $_ENV['DB_USER'], $_ENV['DB_PASS'], $_ENV['DB_PORT']);
+
+    // Conecta ao MySQL sem selecionar banco
     $pdo = new PDO(
-        "mysql:host=" . $_ENV['DB_HOST'],
+        "mysql:host=" . $_ENV['DB_HOST'] . ";port=" . $_ENV['DB_PORT'],
         $_ENV['DB_USER'],
         $_ENV['DB_PASS']
     );
@@ -16,14 +38,14 @@ try {
     // Cria o banco de dados se não existir
     $pdo->exec("CREATE DATABASE IF NOT EXISTS " . $_ENV['DB_NAME'] . 
                " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    
     echo "Banco de dados criado ou já existente!\n";
 
-    // Seleciona o banco de dados
+    // Seleciona o banco
     $pdo->exec("USE " . $_ENV['DB_NAME']);
 
-    // Cria a tabela de colaboradores
-    $sql = "CREATE TABLE IF NOT EXISTS colaboradores (
+    // Cria as tabelas necessárias
+    $sql = "
+    CREATE TABLE IF NOT EXISTS colaboradores (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
@@ -32,13 +54,9 @@ try {
         salario DECIMAL(10,2) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-    $pdo->exec($sql);
-    echo "Tabela 'colaboradores' criada com sucesso!\n";
-
-    // Cria a tabela de animais
-    $sql = "CREATE TABLE IF NOT EXISTS animais (
+    CREATE TABLE IF NOT EXISTS animais (
         id_animal INT PRIMARY KEY AUTO_INCREMENT,
         nome VARCHAR(255) NOT NULL,
         tipo VARCHAR(100) NOT NULL,
@@ -54,23 +72,20 @@ try {
         foto VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-    $pdo->exec($sql);
-    echo "Tabela 'animais' criada com sucesso!\n";
-
-    // Cria a tabela de usuários
-    $sql = "CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ";
     $pdo->exec($sql);
-    echo "Tabela 'users' criada com sucesso!\n";
 
-} catch(PDOException $e) {
+    echo "Tabelas criadas com sucesso!\n";
+
+} catch (Exception $e) {
     echo "Erro: " . $e->getMessage() . "\n";
-} 
+}
