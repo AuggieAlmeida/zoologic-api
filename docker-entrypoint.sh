@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# Cria o arquivo .env a partir das variáveis do ambiente
+# Cria o arquivo .env dinamicamente a partir das variáveis de ambiente
 cat > /var/www/html/.env <<EOL
 DB_HOST=${DB_HOST}
 DB_NAME=${DB_NAME}
@@ -31,6 +31,6 @@ done
 echo "Rodando migrações..."
 php migrate.php
 
-# Inicia o servidor PHP de acordo com a porta definida pelo Railway
+# Inicia o servidor PHP na porta que o Railway define
 echo "Iniciando servidor PHP na porta ${PORT}..."
 php -S 0.0.0.0:${PORT} -t public

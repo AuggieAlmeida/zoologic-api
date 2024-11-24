@@ -1,6 +1,7 @@
+# Base image com PHP 8.2
 FROM php:8.2-cli
 
-# Atualiza o sistema e instala dependências
+# Atualiza o sistema e instala dependências essenciais
 RUN apt-get update && apt-get install -y \
     git \
     zip \
@@ -11,21 +12,21 @@ RUN apt-get update && apt-get install -y \
 # Instala o Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Define o diretório de trabalho
+# Define o diretório de trabalho para a aplicação
 WORKDIR /var/www/html
 
-# Copia os arquivos do projeto
+# Copia os arquivos do projeto para dentro do container
 COPY . .
 
 # Instala as dependências do Composer
 RUN composer install --no-interaction --optimize-autoloader
 
-# Adiciona o script de entrypoint e dá permissão de execução
+# Expondo a porta 8080, que será usada pelo Railway (usualmente a variável de ambiente PORT define a porta a ser usada)
+EXPOSE 8080
+
+# Copia o script de entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Expõe a porta 8000
-EXPOSE 8000
-
-# Define o entrypoint
-ENTRYPOINT ["docker-entrypoint.sh"] 
+# Define o entrypoint para o container
+ENTRYPOINT ["docker-entrypoint.sh"]
