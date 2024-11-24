@@ -11,8 +11,6 @@ DB_PORT=${DB_PORT}
 EOL
 
 echo ".env criado dinamicamente!"
-exec "$@"
-
 
 # Aguarda o MySQL estar pronto
 echo "Aguardando MySQL..."
@@ -33,6 +31,6 @@ done
 echo "Rodando migrações..."
 php migrate.php
 
-# Inicia o servidor PHP
-echo "Iniciando servidor PHP..."
-exec php -S 0.0.0.0:8000 -t public 
+# Inicia o servidor PHP de acordo com a porta definida pelo Railway
+echo "Iniciando servidor PHP na porta ${PORT}..."
+php -S 0.0.0.0:${PORT} -t public
