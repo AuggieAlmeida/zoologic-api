@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     libzip-dev \
+    bash \
     && docker-php-ext-install zip pdo pdo_mysql
 
 # Instala o Composer
@@ -22,7 +23,7 @@ COPY . .
 RUN composer install --no-interaction --optimize-autoloader
 
 # Expondo a porta 8080, que será usada pelo Railway (usualmente a variável de ambiente PORT define a porta a ser usada)
-EXPOSE 8080
+EXPOSE 8000
 
 # Copia o script de entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/

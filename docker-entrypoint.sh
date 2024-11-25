@@ -1,16 +1,10 @@
 #!/bin/sh
 set -e
 
-# Cria o arquivo .env dinamicamente a partir das variáveis de ambiente
-cat > /var/www/html/.env <<EOL
-DB_HOST=${DB_HOST}
-DB_NAME=${DB_NAME}
-DB_USER=${DB_USER}
-DB_PASS=${DB_PASS}
-DB_PORT=${DB_PORT}
-EOL
+# Carrega as variáveis de ambiente do .env
+. /var/www/html/.env
 
-echo ".env criado dinamicamente!"
+echo ".env carregado!"
 
 # Aguarda o MySQL estar pronto
 echo "Aguardando MySQL..."
@@ -31,6 +25,6 @@ done
 echo "Rodando migrações..."
 php migrate.php
 
-# Inicia o servidor PHP na porta que o Railway define
-echo "Iniciando servidor PHP na porta ${PORT}..."
-php -S 0.0.0.0:${PORT} -t public
+# Inicia o servidor PHP 
+echo "Iniciando servidor PHP na porta 8000..."
+php -S 0.0.0.0:8000 -t public
