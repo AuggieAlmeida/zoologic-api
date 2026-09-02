@@ -1,30 +1,31 @@
 #!/bin/sh
 set -e
 
-# Carrega as variáveis de ambiente do .env
-. /var/www/html/.env
+# The .env file only exists in local development. On a managed platform the
+# configuration arrives as real environment variables, so sourcing it
+# unconditionally under `set -e` would kill the container on boot.
+if [ -f /var/www/html/.env ]; then
+    set -a
+    . /var/www/html/.env
+    set +a
+    echo ".env carregado!"
+else
+    echo ".env ausente: usando as variáveis do ambiente."
+fi
 
-echo ".env carregado!"
+# Platforms assign the port and expect the process to bind it.
+: "${PORT:=8000}"
 
-# Aguarda o MySQL estar pronto
-echo "Aguardando MySQL..."
-while ! php -r "
-try {
-    new PDO('mysql:host=${DB_HOST};dbname=${DB_NAME}', '${DB_USER}', '${DB_PASS}');
-    echo 'MySQL conectado!\n';
-    exit(0);
-} catch (PDOException \$e) {
-    exit(1);
-}
-"
-do
-    sleep 1
-done
+# Waiting for the database and creating the schema both live in migrate.php,
+# which reuses the application DSN, port and TLS settings. It exits non-zero on
+# failure, and `set -e` turns that into a failed boot instead of a server
+# answering every request with a database error.
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+    echo "Rodando migrações..."
+    php migrate.php
+else
+    echo "RUN_MIGRATIONS desativado: pulando as migrações."
+fi
 
-# Roda as migrações
-echo "Rodando migrações..."
-php migrate.php
-
-# Inicia o servidor PHP 
-echo "Iniciando servidor PHP na porta 8000..."
-php -S 0.0.0.0:8000 -t public
+echo "Iniciando servidor PHP na porta ${PORT}..."
+exec php -S "0.0.0.0:${PORT}" -t public

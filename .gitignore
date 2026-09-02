@@ -1,4 +1,5 @@
 /vendor/
 /.env
-/.env.example
+# .env.example is versioned on purpose; only the real .env is ignored.
 .phpunit.result.cache
+/graphify-out/

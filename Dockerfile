@@ -22,7 +22,7 @@ COPY . .
 # Instala as dependências do Composer
 RUN composer install --no-interaction --optimize-autoloader
 
-# Expondo a porta 8080, que será usada pelo Railway (usualmente a variável de ambiente PORT define a porta a ser usada)
+# Default port. The entrypoint binds $PORT when the platform assigns one.
 EXPOSE 8000
 
 # Copia o script de entrypoint

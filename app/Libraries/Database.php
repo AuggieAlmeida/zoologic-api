@@ -1,6 +1,8 @@
 <?php
 namespace App\Libraries;
 
+use App\Config\Config;
+
 class Database
 {
     private static $instance = null;
@@ -9,15 +11,69 @@ class Database
     private function __construct()
     {
         $this->pdo = new \PDO(
-            "mysql:host=" . $_ENV['DB_HOST'] . ";dbname=" . $_ENV['DB_NAME'],
-            $_ENV['DB_USER'],
-            $_ENV['DB_PASS'],
-            [
-                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
-                \PDO::ATTR_EMULATE_PREPARES => false
-            ]
+            self::dsn(),
+            Config::get('DB_USER'),
+            Config::get('DB_PASS', ''),
+            self::pdoOptions()
         );
+    }
+
+    /**
+     * Build the MySQL DSN.
+     *
+     * The port is explicit because managed MySQL rarely listens on 3306:
+     * TiDB Cloud uses 4000 and Northflank assigns its own.
+     */
+    public static function dsn($includeDatabase = true)
+    {
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s',
+            Config::get('DB_HOST', '127.0.0.1'),
+            Config::get('DB_PORT', '3306')
+        );
+
+        // The migration connects to the server before the database exists, so
+        // it asks for a DSN without the dbname.
+        if ($includeDatabase) {
+            $dsn .= ';dbname=' . Config::get('DB_NAME', '');
+        }
+
+        return $dsn . ';charset=utf8mb4';
+    }
+
+    /**
+     * PDO options, with TLS added when a CA bundle is configured.
+     *
+     * Managed MySQL providers only accept encrypted connections. TLS is driven
+     * by DB_SSL_CA alone, because mysqlnd only negotiates an encrypted
+     * connection when an SSL attribute is present: setting
+     * MYSQL_ATTR_SSL_VERIFY_SERVER_CERT by itself leaves the traffic in the
+     * clear, verified empirically against MySQL 8 (Ssl_cipher came back empty).
+     *
+     * For a provider with a certificate signed by a public CA, such as TiDB
+     * Cloud, the system bundle is enough:
+     *   DB_SSL_CA=/etc/ssl/certs/ca-certificates.crt
+     *
+     * DB_SSL_VERIFY should stay on. Turning it off keeps the traffic encrypted
+     * but stops checking who is on the other end, and is only for a provider
+     * whose certificate the bundle cannot chain.
+     */
+    public static function pdoOptions()
+    {
+        $options = [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            \PDO::ATTR_EMULATE_PREPARES => false
+        ];
+
+        $ca = Config::get('DB_SSL_CA');
+
+        if ($ca !== null && $ca !== '') {
+            $options[\PDO::MYSQL_ATTR_SSL_CA] = $ca;
+            $options[\PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = Config::bool('DB_SSL_VERIFY', true);
+        }
+
+        return $options;
     }
 
     // Prevent cloning of the instance

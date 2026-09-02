@@ -1,47 +1,72 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
 
-// Carrega as variáveis de ambiente
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-$dotenv->load();
+use App\Config\Config;
+use App\Libraries\Database;
 
-// Função para aguardar o banco estar disponível
-function waitForDatabase($host, $user, $pass, $port = 3306, $retries = 10, $delay = 5) {
-    $dsn = "mysql:host={$host};port={$port}";
+// The .env file is optional: managed platforms inject real environment
+// variables instead of shipping a file.
+Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
+
+/**
+ * Wait for the database to accept connections.
+ *
+ * Reuses the application DSN and PDO options so the wait exercises the same
+ * TLS settings the API will use, instead of a second, weaker connection.
+ */
+function waitForDatabase($dsn, $user, $pass, array $options, $retries = 10, $delay = 5) {
     while ($retries > 0) {
         try {
-            $pdo = new PDO($dsn, $user, $pass);
-            $pdo = null;
+            new PDO($dsn, $user, $pass, $options);
             echo "Banco de dados está disponível!\n";
             return;
         } catch (PDOException $e) {
+            $retries--;
+            if ($retries === 0) {
+                throw new Exception(
+                    'Banco de dados indisponível após várias tentativas: ' . $e->getMessage()
+                );
+            }
             echo "Aguardando banco de dados... ({$retries} tentativas restantes)\n";
             sleep($delay);
-            $retries--;
         }
     }
-    throw new Exception("Banco de dados indisponível após várias tentativas.");
 }
 
 try {
-    // Aguarda o banco de dados ficar disponível
-    waitForDatabase($_ENV['DB_HOST'], $_ENV['DB_USER'], $_ENV['DB_PASS'], $_ENV['DB_PORT']);
+    $user = Config::get('DB_USER');
+    $pass = Config::get('DB_PASS', '');
+    $options = Database::pdoOptions();
 
-    // Conecta ao MySQL sem selecionar banco
-    $pdo = new PDO(
-        "mysql:host=" . $_ENV['DB_HOST'] . ";port=" . $_ENV['DB_PORT'],
-        $_ENV['DB_USER'],
-        $_ENV['DB_PASS']
-    );
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // A managed MySQL hands over a database that already exists and a user
+    // without the CREATE DATABASE grant, so the migration connects straight to
+    // it and only creates tables.
+    $managed = Config::bool('DB_MANAGED');
+    $dsn = Database::dsn($managed);
 
-    // Cria o banco de dados se não existir
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS " . $_ENV['DB_NAME'] . 
-               " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    echo "Banco de dados criado ou já existente!\n";
+    waitForDatabase($dsn, $user, $pass, $options);
 
-    // Seleciona o banco
-    $pdo->exec("USE " . $_ENV['DB_NAME']);
+    $pdo = new PDO($dsn, $user, $pass, $options);
+
+    if ($managed) {
+        echo "DB_MANAGED ativo: usando o banco já provisionado.\n";
+    } else {
+        $name = Config::get('DB_NAME', '');
+
+        // The database name cannot be a bound parameter, so it is validated
+        // before being interpolated into DDL.
+        if (!preg_match('/^[A-Za-z0-9_]+$/', (string) $name)) {
+            throw new Exception('DB_NAME inválido ou ausente: ' . var_export($name, true));
+        }
+
+        $pdo->exec(
+            "CREATE DATABASE IF NOT EXISTS `{$name}`" .
+            " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+        );
+        echo "Banco de dados criado ou já existente!\n";
+
+        $pdo->exec("USE `{$name}`");
+    }
 
     // Cria as tabelas necessárias
     $sql = "
@@ -85,7 +110,9 @@ try {
     $pdo->exec($sql);
 
     echo "Tabelas criadas com sucesso!\n";
-
 } catch (Exception $e) {
-    echo "Erro: " . $e->getMessage() . "\n";
+    // The entrypoint runs this script before starting the server, so a failed
+    // migration has to fail the process instead of printing and returning 0.
+    fwrite(STDERR, 'Erro: ' . $e->getMessage() . "\n");
+    exit(1);
 }
