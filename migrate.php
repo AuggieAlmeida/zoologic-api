@@ -76,6 +76,7 @@ try {
         email VARCHAR(255) NOT NULL UNIQUE,
         senha VARCHAR(255) NOT NULL,
         funcao VARCHAR(100) NOT NULL,
+        setor VARCHAR(100) NULL,
         salario DECIMAL(10,2) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -87,7 +88,7 @@ try {
         tipo VARCHAR(100) NOT NULL,
         especie VARCHAR(100) NOT NULL,
         setor VARCHAR(100) NOT NULL,
-        habitat VARCHAR(100) NOT NULL,
+        habitat_id INT NOT NULL,
         idade INT NOT NULL,
         peso DECIMAL(10,2) NOT NULL,
         alimentacao VARCHAR(255) NOT NULL,
@@ -106,8 +107,98 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS veterinarios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        crmv VARCHAR(50) NOT NULL UNIQUE,
+        especialidade VARCHAR(150) NOT NULL,
+        telefone VARCHAR(30) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS habitats (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(150) NOT NULL UNIQUE,
+        tipo VARCHAR(100) NOT NULL,
+        capacidade INT NOT NULL,
+        localizacao VARCHAR(150) NOT NULL,
+        descricao TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ";
     $pdo->exec($sql);
+
+    // Compatibiliza bancos locais já existentes com a feature de delegação.
+    $columnExists = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.columns " .
+        "WHERE table_schema = DATABASE() AND table_name = 'colaboradores' AND column_name = 'setor'"
+    );
+    $columnExists->execute();
+    if ((int) $columnExists->fetchColumn() === 0) {
+        $pdo->exec("ALTER TABLE colaboradores ADD COLUMN setor VARCHAR(100) NULL");
+    }
+
+    // Migra o vínculo textual legado para uma relação por chave estrangeira.
+    // A etapa é idempotente para que possa rodar tanto em bancos antigos quanto
+    // em instalações novas sem perder os animais já cadastrados.
+    $animalColumns = $pdo->prepare(
+        "SELECT column_name FROM information_schema.columns " .
+        "WHERE table_schema = DATABASE() AND table_name = 'animais' " .
+        "AND column_name IN ('habitat', 'habitat_id')"
+    );
+    $animalColumns->execute();
+    $animalColumnNames = $animalColumns->fetchAll(PDO::FETCH_COLUMN);
+
+    if (!in_array('habitat_id', $animalColumnNames, true)) {
+        $pdo->exec("ALTER TABLE animais ADD COLUMN habitat_id INT NULL AFTER setor");
+    }
+
+    if (in_array('habitat', $animalColumnNames, true)) {
+        // Registros antigos com nomes que ainda não existem viram habitats
+        // provisórios, preservando o dado e permitindo concluir a migração.
+        $pdo->exec(
+            "INSERT INTO habitats (nome, tipo, capacidade, localizacao, descricao) " .
+            "SELECT DISTINCT a.habitat, 'A definir', 1, 'A definir', " .
+            "'Habitat importado do cadastro legado.' " .
+            "FROM animais a LEFT JOIN habitats h ON h.nome = a.habitat " .
+            "WHERE a.habitat IS NOT NULL AND a.habitat <> '' AND h.id IS NULL"
+        );
+        $pdo->exec(
+            "UPDATE animais a INNER JOIN habitats h ON h.nome = a.habitat " .
+            "SET a.habitat_id = h.id"
+        );
+    }
+
+    $missingHabitat = $pdo->query(
+        "SELECT COUNT(*) FROM animais WHERE habitat_id IS NULL"
+    )->fetchColumn();
+    if ((int) $missingHabitat > 0) {
+        throw new Exception('Não foi possível vincular todos os animais a um habitat.');
+    }
+
+    $pdo->exec("ALTER TABLE animais MODIFY COLUMN habitat_id INT NOT NULL");
+
+    if (in_array('habitat', $animalColumnNames, true)) {
+        $pdo->exec("ALTER TABLE animais DROP COLUMN habitat");
+    }
+
+    $foreignKey = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.table_constraints " .
+        "WHERE constraint_schema = DATABASE() AND table_name = 'animais' " .
+        "AND constraint_name = 'fk_animais_habitat' AND constraint_type = 'FOREIGN KEY'"
+    );
+    $foreignKey->execute();
+    if ((int) $foreignKey->fetchColumn() === 0) {
+        $pdo->exec(
+            "ALTER TABLE animais ADD CONSTRAINT fk_animais_habitat " .
+            "FOREIGN KEY (habitat_id) REFERENCES habitats(id) " .
+            "ON UPDATE CASCADE ON DELETE RESTRICT"
+        );
+    }
 
     echo "Tabelas criadas com sucesso!\n";
 } catch (Exception $e) {

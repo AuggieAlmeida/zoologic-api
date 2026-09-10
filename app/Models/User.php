@@ -9,7 +9,7 @@ class User
     private $db;
     private $table = 'users';
 
-    public function __construct(Database $db = null)
+    public function __construct(?Database $db = null)
     {
         $this->db = $db ?? Database::getInstance();
     }
@@ -120,5 +120,12 @@ class User
             error_log("Database error in User::validate: " . $e->getMessage());
             return false;
         }
+    }
+
+    public function findByEmail($email)
+    {
+        $stmt = $this->db->prepare("SELECT id, email FROM {$this->table} WHERE email = :email");
+        $stmt->execute([':email' => $email]);
+        return $stmt->fetch();
     }
 }

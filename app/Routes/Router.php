@@ -5,6 +5,9 @@ namespace App\Routes;
 use App\Controllers\UserController;
 use App\Controllers\ColaboradorController;
 use App\Controllers\AnimalController;
+use App\Controllers\VeterinarioController;
+use App\Controllers\HabitatController;
+use App\Middleware\AuthMiddleware;
 
 class Router
 {
@@ -47,6 +50,9 @@ class Router
         foreach ($this->routes as $route) {
             $result = $this->matchPath($route['path'], $path);
             if ($route['method'] === $method && $result['match']) {
+                if (!in_array($route['path'], ['/api/register', '/api/login', '/api/health'], true)) {
+                    AuthMiddleware::requireAuth();
+                }
                 return $this->handleRequest($route['handler'], $result['params']);
             }
         }
@@ -89,6 +95,7 @@ class Router
         $this->get('/api/colaboradores/{id}', [ColaboradorController::class, 'show']);
         $this->post('/api/colaboradores', [ColaboradorController::class, 'store']);
         $this->put('/api/colaboradores/{id}', [ColaboradorController::class, 'update']);
+        $this->put('/api/colaboradores/{id}/delegar', [ColaboradorController::class, 'delegar']);
         $this->delete('/api/colaboradores/{id}', [ColaboradorController::class, 'destroy']);
 
         // Adicionando rotas para animais
@@ -97,6 +104,18 @@ class Router
         $this->post('/api/animais', [AnimalController::class, 'store']);
         $this->put('/api/animais/{id}', [AnimalController::class, 'update']);
         $this->delete('/api/animais/{id}', [AnimalController::class, 'destroy']);
+
+        // Adicionando rotas para veterinários
+        $this->get('/api/veterinarios', [VeterinarioController::class, 'index']);
+        $this->get('/api/veterinarios/{id}', [VeterinarioController::class, 'show']);
+        $this->post('/api/veterinarios', [VeterinarioController::class, 'store']);
+        $this->put('/api/veterinarios/{id}', [VeterinarioController::class, 'update']);
+        $this->delete('/api/veterinarios/{id}', [VeterinarioController::class, 'destroy']);
+        $this->get('/api/habitats', [HabitatController::class, 'index']);
+        $this->get('/api/habitats/{id}', [HabitatController::class, 'show']);
+        $this->post('/api/habitats', [HabitatController::class, 'store']);
+        $this->put('/api/habitats/{id}', [HabitatController::class, 'update']);
+        $this->delete('/api/habitats/{id}', [HabitatController::class, 'destroy']);
 
         // Rota de health check
         $this->get('/api/health', function() {

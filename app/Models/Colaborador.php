@@ -33,14 +33,14 @@ class Colaborador
 
     public function findAll()
     {
-        $sql = "SELECT id, nome, email, funcao, salario, created_at, updated_at 
+        $sql = "SELECT id, nome, email, funcao, setor, salario, created_at, updated_at 
                 FROM colaboradores";
         return $this->db->query($sql);
     }
 
     public function findById($id)
     {
-        $sql = "SELECT id, nome, email, funcao, salario, created_at, updated_at 
+        $sql = "SELECT id, nome, email, funcao, setor, salario, created_at, updated_at 
                 FROM colaboradores WHERE id = :id";
         return $this->db->queryOne($sql, ['id' => $id]);
     }
@@ -60,6 +60,12 @@ class Colaborador
         ];
 
         return $this->db->execute($sql, $params);
+    }
+
+    public function assignSector($id, $setor)
+    {
+        $sql = "UPDATE colaboradores SET setor = :setor WHERE id = :id";
+        return $this->db->execute($sql, ['id' => $id, 'setor' => $setor]);
     }
 
     public function delete($id)

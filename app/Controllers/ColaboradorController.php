@@ -62,6 +62,21 @@ class ColaboradorController extends Controller
         }
     }
 
+    public function delegar($id)
+    {
+        $data = $this->getRequestData();
+        if (empty($data['setor'])) {
+            return $this->json(['error' => 'Setor é obrigatório'], 400);
+        }
+
+        if (!$this->colaboradorModel->findById($id)) {
+            return $this->json(['error' => 'Colaborador não encontrado'], 404);
+        }
+
+        $this->colaboradorModel->assignSector($id, $data['setor']);
+        $this->json(['message' => 'Colaborador delegado com sucesso'], 200);
+    }
+
     public function destroy($id)
     {
         if ($this->colaboradorModel->delete($id)) {

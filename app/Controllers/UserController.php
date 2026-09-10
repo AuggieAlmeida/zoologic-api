@@ -2,9 +2,10 @@
 namespace App\Controllers;
 
 use App\Models\User;
+use App\Libraries\JwtService;
 use Exception;
 
-class UserController
+class UserController extends Controller
 {
     public function register()
     {
@@ -64,8 +65,12 @@ class UserController
                 throw new Exception('Invalid credentials');
             }
 
-            // Here you would typically generate a JWT or session token
-            echo json_encode(['message' => 'Login successful']);
+            $account = $user->findByEmail($data['email']);
+            echo json_encode([
+                'message' => 'Login successful',
+                'token' => JwtService::issue((int) $account['id'], $account['email']),
+                'user' => $account,
+            ]);
             
         } catch (Exception $e) {
             http_response_code(401);
@@ -77,6 +82,9 @@ class UserController
     public function getUser($id)
     {
         try {
+            if (!$this->canAccessUser($id)) {
+                return $this->json(['error' => 'Acesso negado'], 403);
+            }
             if (!$id || !is_numeric($id)) {
                 throw new Exception('Invalid user ID');
             }
@@ -100,6 +108,9 @@ class UserController
     public function updateUser($id)
     {
         try {
+            if (!$this->canAccessUser($id)) {
+                return $this->json(['error' => 'Acesso negado'], 403);
+            }
             if (!$id || !is_numeric($id)) {
                 throw new Exception('Invalid user ID');
             }
@@ -133,6 +144,9 @@ class UserController
     public function deleteUser($id)
     {
         try {
+            if (!$this->canAccessUser($id)) {
+                return $this->json(['error' => 'Acesso negado'], 403);
+            }
             if (!$id || !is_numeric($id)) {
                 throw new Exception('Invalid user ID');
             }
@@ -151,5 +165,11 @@ class UserController
             echo json_encode(['error' => $e->getMessage()]);
             error_log("Delete user error: " . $e->getMessage());
         }
+    }
+
+    private function canAccessUser($id): bool
+    {
+        $claims = $_REQUEST['auth'] ?? null;
+        return $claims !== null && isset($claims->sub) && (int) $claims->sub === (int) $id;
     }
 }
