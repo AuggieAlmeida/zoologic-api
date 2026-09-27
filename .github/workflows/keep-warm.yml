@@ -1,0 +1,33 @@
+# Render's free instance sleeps after 15 minutes without traffic, and the
+# first request after that waits about 50 seconds while it boots. A demo link
+# opened by someone evaluating the project should not start with that wait,
+# so this pings the API every 10 minutes.
+#
+# Cost: one always-on free instance uses up to 744 of the workspace's 750
+# monthly free hours (31-day month). Any other free service running in the same
+# workspace can exhaust the pool before the month ends, and Render then
+# suspends free services until the next month.
+#
+# GitHub delays scheduled runs under load and disables schedules in public
+# repositories after 60 days without activity, so this narrows the cold starts
+# rather than ruling them out. Pause it with: gh workflow disable keep-warm.yml
+name: Keep warm
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the API health check
+        env:
+          HEALTH_URL: https://zoologic-api.onrender.com/api/health
+        # A sleeping instance takes about a minute to answer, hence the long
+        # timeout and the retries.
+        run: curl --fail --silent --show-error --max-time 90 --retry 2 --retry-delay 15 "$HEALTH_URL"

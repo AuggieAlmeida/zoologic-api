@@ -138,3 +138,5 @@ What changed:
 - **Four server workers.** The built-in server handled one request at a time, so the dashboard's three calls ran in sequence and a 600 ms login (bcrypt) stalled everything behind it.
 - **OPcache under the CLI SAPI**, which the built-in server runs in and where OPcache is off by default.
 - **No dev dependencies in the image**, with an authoritative classmap.
+
+The free instance also sleeps after 15 minutes without traffic, and the first request after that waits about 50 seconds. [`keep-warm.yml`](.github/workflows/keep-warm.yml) pings `/api/health` every 10 minutes to keep the demo awake. It uses up to 744 of the workspace's 750 free monthly hours, and GitHub can delay scheduled runs, so it narrows cold starts rather than ruling them out.
