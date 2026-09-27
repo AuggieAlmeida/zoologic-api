@@ -35,7 +35,7 @@ class ColaboradorControllerTest extends TestCase
         $this->controller->index();
         $output = ob_get_clean();
 
-        $this->assertEquals(json_encode($expectedData), $output);
+        $this->assertJsonStringEqualsJsonString(json_encode($expectedData), $output);
     }
 
     public function testShowReturnsColaborador()
@@ -55,6 +55,6 @@ class ColaboradorControllerTest extends TestCase
         $this->controller->show(1);
         $output = ob_get_clean();
 
-        $this->assertEquals(json_encode($expectedData), $output);
+        $this->assertJsonStringEqualsJsonString(json_encode($expectedData), $output);
     }
 } 

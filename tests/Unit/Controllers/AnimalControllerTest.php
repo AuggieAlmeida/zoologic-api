@@ -46,7 +46,7 @@ class AnimalControllerTest extends TestCase
         $this->controller->index();
         $output = ob_get_clean();
 
-        $this->assertEquals(json_encode($expectedData), $output);
+        $this->assertJsonStringEqualsJsonString(json_encode($expectedData), $output);
     }
 
     public function testShowReturnsAnimal()
@@ -66,7 +66,7 @@ class AnimalControllerTest extends TestCase
         $this->controller->show(1);
         $output = ob_get_clean();
 
-        $this->assertEquals(json_encode($expectedData), $output);
+        $this->assertJsonStringEqualsJsonString(json_encode($expectedData), $output);
     }
 
     public function testShowReturnsNotFound()
@@ -80,7 +80,7 @@ class AnimalControllerTest extends TestCase
         $this->controller->show(999);
         $output = ob_get_clean();
 
-        $this->assertEquals(
+        $this->assertJsonStringEqualsJsonString(
             json_encode(['error' => 'Animal não encontrado']), 
             $output
         );
@@ -89,10 +89,11 @@ class AnimalControllerTest extends TestCase
     public function testStoreAnimalSuccess()
     {
         $requestData = [
+            'nome' => 'Simba',
             'tipo' => 'Mamífero',
             'especie' => 'Panthera leo',
             'setor' => 'Felinos',
-            'habitat' => 'Savana',
+            'habitat_id' => 1,
             'idade' => 5,
             'peso' => 180.5,
             'alimentacao' => 'Carnívoro',
@@ -102,6 +103,10 @@ class AnimalControllerTest extends TestCase
 
         $this->controller->setRequestData($requestData);
 
+        // Storing validates the habitat and its capacity before inserting.
+        $this->modelMock->method('findHabitat')->willReturn(['id' => 1, 'capacidade' => 10]);
+        $this->modelMock->method('countByHabitat')->willReturn(0);
+
         $this->modelMock->expects($this->once())
             ->method('create')
             ->willReturn(true);
@@ -110,7 +115,7 @@ class AnimalControllerTest extends TestCase
         $this->controller->store();
         $output = ob_get_clean();
 
-        $this->assertEquals(
+        $this->assertJsonStringEqualsJsonString(
             json_encode(['message' => 'Animal cadastrado com sucesso']),
             $output
         );
@@ -129,8 +134,8 @@ class AnimalControllerTest extends TestCase
         $this->controller->store();
         $output = ob_get_clean();
 
-        $this->assertEquals(
-            json_encode(['error' => 'Campo obrigatório ausente: especie']),
+        $this->assertJsonStringEqualsJsonString(
+            json_encode(['error' => 'Campo obrigatório ausente: nome']),
             $output
         );
     }
