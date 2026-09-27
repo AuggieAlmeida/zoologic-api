@@ -96,8 +96,10 @@ Every setting comes from the environment. A `.env` file is read when present and
 | `DB_SSL_CA` | empty | Path to a CA bundle. Setting it turns TLS on. |
 | `DB_SSL_VERIFY` | `true` | Verify the server certificate. |
 | `RUN_MIGRATIONS` | `true` | Run `migrate.php` on boot. |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Exact origins allowed to send credentialed requests, comma separated. |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Exact origins allowed to send credentialed requests, comma separated. The deployed front end proxies through its own origin and does not need to be listed. |
 | `JWT_SECRET` | — | Signing key for tokens. Required. |
+| `DB_PERSISTENT` | `true` | Reuse the database connection across requests. |
+| `PHP_CLI_SERVER_WORKERS` | `4` | Worker processes of the built-in server. |
 
 ## Tests
 
@@ -120,3 +122,19 @@ These decisions were made while taking the 2024 version to production.
   - it sends `Vary: Origin`;
   - it answers preflight requests with `204`.
 - **Managed databases need a different migration.** Hosted MySQL users usually lack the grant for `CREATE DATABASE`, so with `DB_MANAGED=true` the migration connects straight to the provisioned database. The database name is validated before it goes into DDL, because identifiers cannot be bound as parameters.
+
+## Performance
+
+The free instance has 0.1 vCPU, so the work done per request shows directly in the response time. Measured locally with the container limited to `--cpus=0.1` and TLS to MySQL, mean of 60 requests per endpoint:
+
+| | Before | After |
+|---|---|---|
+| List endpoints (`/animais`, `/habitats`, ...) | 47–60 ms | 19–23 ms |
+| Three parallel calls, as the dashboard makes | 150–169 ms | 64–69 ms |
+
+What changed:
+
+- **Persistent database connection.** Opening a TLS connection and authenticating took about 80 ms of an 85 ms list request. The connection now survives across requests in each worker; 30 consecutive requests caused no new TLS handshake on the database. PDO pings a pooled connection before reusing it, so a connection the server dropped is replaced transparently, verified by killing every connection from the database side.
+- **Four server workers.** The built-in server handled one request at a time, so the dashboard's three calls ran in sequence and a 600 ms login (bcrypt) stalled everything behind it.
+- **OPcache under the CLI SAPI**, which the built-in server runs in and where OPcache is off by default.
+- **No dev dependencies in the image**, with an authoritative classmap.

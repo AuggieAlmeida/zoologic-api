@@ -27,5 +27,12 @@ else
     echo "RUN_MIGRATIONS desativado: pulando as migrações."
 fi
 
-echo "Iniciando servidor PHP na porta ${PORT}..."
+# The built-in server handles one request at a time unless it is told to fork
+# workers. With a single process a 600 ms login (bcrypt) stalled every other
+# request queued behind it, and the three calls the dashboard fires together
+# ran one after the other.
+: "${PHP_CLI_SERVER_WORKERS:=4}"
+export PHP_CLI_SERVER_WORKERS
+
+echo "Iniciando servidor PHP na porta ${PORT} com ${PHP_CLI_SERVER_WORKERS} workers..."
 exec php -S "0.0.0.0:${PORT}" -t public

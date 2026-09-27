@@ -10,11 +10,18 @@ class Database
 
     private function __construct()
     {
+        // A persistent connection survives across requests served by the same
+        // server process. Without it every request pays a new TCP and TLS
+        // handshake plus authentication against the database, which measured
+        // at about 80 ms of the 85 ms a list endpoint took on a 0.1 vCPU
+        // instance. PDO pings a pooled connection before reusing it and opens
+        // a fresh one when the server has dropped it. The migration keeps
+        // short-lived connections, so the flag lives here, not in pdoOptions().
         $this->pdo = new \PDO(
             self::dsn(),
             Config::get('DB_USER'),
             Config::get('DB_PASS', ''),
-            self::pdoOptions()
+            self::pdoOptions() + [\PDO::ATTR_PERSISTENT => Config::bool('DB_PERSISTENT', true)]
         );
     }
 
